@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Blog-API Monitor — INF222</title>
+
+  <!-- Icône du site -->
+  <link rel="favicon" type="image/png" href="TPINF222.png" />
+
+  <!-- Polices Google pour un affichage moderne et fluide -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  
+  <!-- [ACTION] M3: Dépendance jsPDF pour la génération cloud-free côté client -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    /* ==========================================================================
+       VARIABLES CSS - Thème sombre et moderne
+       ========================================================================== */
+    :root {
+      --bg: #0b0d12;         /* Fond principal très sombre */
+      --surface: #13161f;    /* Fond des cartes et éléments en surbrillance */
+      --raised: #1a1e2b;     /* Éléments surélevés (toasts, menus) */
+      --border: rgba(255,255,255,0.06); /* Bordures subtiles */
+      
+      --amber: #e5b84a;      /* Couleur d'accent principale (Or/Ambre) */
+      --amber-dim: rgba(229,184,74,0.12); /* Ambre transparent pour les hovers */
+      
+      --sage: #5cbf8a;       /* Vert pour le succès ("En ligne") */
+      --rose: #e05a5a;       /* Rouge pour les erreurs ("Hors ligne") */
+      --teal: #3dbfb8;       /* Bleu-vert pour les informations neutres */
+      --orange: #e0973a;     /* Orange pour les avertissements */
+      --muted: #6b7394;      /* Texte secondaire (gris-bleu) */
+      --dim: #3d4560;        /* Texte très discret (grisé) */
+      --text: #e8e4d9;       /* Texte principal (blanc cassé doux) */
+      
+      --r: 12px;             /* Rayon de bordure global (border-radius) */
+    }
+
+    /* Reset global des marges et du dimensionnement */
+    *{box-sizing:border-box;margin:0;padding:0}
+    
+    /* Style global de la page */
+    body{
+      background:var(--bg); 
+      color:var(--text);
+      font-family:'Inter','Segoe UI',system-ui,sans-serif; /* Police lisible sans serif */
+      font-size:14px;
+      line-height:1.6;
+      padding:28px 32px;
+      min-height:100vh;
+    }
+
+    /* --- HEADER --- */
+    .header{
+      margin-bottom:28px;
+      border-bottom:1px solid var(--border); /* Ligne de séparation en bas */
+      padding-bottom:16px;
+      display:flex;
+      align-items:center;
+      gap:14px;
+    }
+    .header-icon{width:36px;height:36px;color:var(--amber);flex-shrink:0}
+    .header h1{font-size:1.8rem;font-weight:800;color:var(--amber);letter-spacing:-0.02em}
+    .header .sub{color:var(--muted);font-size:.82rem;margin-top:2px}
+
+    /* --- GESTION DU GRID DES CARTES --- */
+    /* Crée une grille adaptable selon la largeur de l'écran */
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+    
+    /* Style individuel de chaque carte */
+    .card{
+      background:var(--surface);
+      border-radius:var(--r);
+      padding:20px;
+      border:1px solid var(--border);
+      transition:transform .2s,box-shadow .2s; /* Animation douce au survol */
+    }
+    .card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)} /* Effet d'élévation */
+    
+    /* Étiquettes et valeurs dans les cartes */
+    .card-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;font-weight:600}
+    .card-value{font-size:1.7rem;font-weight:800;color:var(--amber);line-height:1.2}
+    
+    /* Couleurs sémantiques pour les valeurs */
+    .card-value.ok{color:var(--sage)}   /* Vert */
+    .card-value.err{color:var(--rose)}  /* Rouge */
+    .card-value.info{color:var(--teal)} /* Bleu-vert */
+    
+    /* Affichage du chronomètre (temps restant) */
+    .timer{color:var(--dim);font-size:.72rem;margin-top:6px;font-family:'JetBrains Mono',monospace}
+
+    /* --- BOUTONS D'ACTION --- */
+    .actions{display:flex;gap:10px;margin-bottom:28px;flex-wrap:wrap}
+    
+    /* Bouton principal (dégradé) */
+    button{
+      background:linear-gradient(135deg,var(--amber),#d4a53a);
+      color:#0b0d12; /* Texte sombre pour contraster avec le fond clair du bouton */
+      border:none;
+      border-radius:8px;
+      padding:10px 22px;
+      font-weight:700;
+      cursor:pointer;
+      font-size:.85rem;
+      font-family:'Inter',sans-serif;
+      transition:all .2s ease;
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+    }
+    button:hover{background:linear-gradient(135deg,#f0c95a,var(--amber));transform:translateY(-1px);box-shadow:0 4px 16px rgba(229,184,74,.3)}
+    button:active{transform:translateY(0)} /* Effet d'enfoncement au clic */
+    
+    /* Bouton secondaire (fond transparent, bordure apparente) */
+    button.sec{background:transparent;color:var(--amber);border:1px solid rgba(229,184,74,.35)}
+    button.sec:hover{background:var(--amber-dim);border-color:var(--amber)}
+    
+    /* Taille des icônes SVG dans les boutons */
+    button svg{width:16px;height:16px;flex-shrink:0}
+
+    /* --- TITRES DE SECTIONS --- */
+    .section-title{font-size:.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:24px 0 14px;display:flex;align-items:center;gap:10px}
+    .section-title svg{width:18px;height:18px;color:var(--amber);flex-shrink:0}
+    /* Ligne décorative après le titre */
+    .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    /* --- GRAPHIQUES --- */
+    /* [ACTION] M2: Layout 2 colonnes explicite pour afficher des graphiques pleine largeur */
+    .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+    .chart-card{background:var(--surface);border-radius:var(--r);padding:20px;border:1px solid var(--border);position:relative}
+    .chart-card.full-width{grid-column:span 2}
+    .chart-card h3{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+    .chart-card h3 svg{width:16px;height:16px;flex-shrink:0}
+    /* Les Canvas s'ajustent pour être 100% responsifs */
+    canvas{width:100%!important;height:180px!important;border-radius:6px;}
+
+    /* [ACTION] M2: Styles des boutons de zoom */
+    .zoom-controls{position:absolute;top:18px;right:20px;display:flex;align-items:center;background:var(--bg);padding:2px 4px;border-radius:6px;border:1px solid var(--border)}
+    .zoom-controls button{padding:4px 10px;font-size:12px;cursor:pointer;background:transparent;border:none;color:var(--amber);font-weight:bold;border-radius:4px}
+    .zoom-controls button:hover{background:var(--amber-dim)}
+    .zoom-controls span{font-size:11px;color:var(--muted);margin:0 10px;font-family:'JetBrains Mono',monospace;font-weight:600}
+
+    /* --- BOÎTE DES LOGS (Journal) --- */
+    .log-box{
+      background:var(--surface);
+      border-radius:var(--r);
+      padding:8px;
+      max-height:440px;      /* Hauteur maximale limitant l'expansion */
+      overflow-y:auto;       /* Ajoute une scrollbar si les logs débordent */
+      border:1px solid var(--border);
+      font-family:'JetBrains Mono','Consolas',monospace; /* Police monospace pour aligner le texte */
+      font-size:.78rem;
+    }
+    
+    /* Personnalisation de la Scrollbar (Chrome/Edge/Safari) */
+    .log-box::-webkit-scrollbar{width:6px}
+    .log-box::-webkit-scrollbar-track{background:transparent}
+    .log-box::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
+
+    /* Ligne individuelle de log */
+    .log-line{
+      padding:8px 12px;
+      margin:2px 0;
+      border-radius:6px;
+      display:grid;          /* Utilise une grille pour aligner parfaitement date / niveau / message */
+      grid-template-columns:150px 70px 1fr;
+      gap:12px;
+      align-items:baseline;
+      background:rgba(255,255,255,.01);
+      border:1px solid transparent;
+      transition:background .15s;
+      line-height:1.5;
+      word-break:break-word;
+    }
+    .log-line:hover{background:rgba(255,255,255,.03);border-color:var(--border)} /* Surbrillance au survol d'une ligne */
+
+    /* Composants d'un log */
+    .log-line .t{color:var(--dim);font-size:.72rem;white-space:nowrap} /* Heure */
+    .log-line .lv{font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em} /* Niveau : OK, ERROR, etc... */
+    .log-line .msg{color:var(--text);font-size:.76rem} /* Message */
+
+    /* Couleurs spécifiques selon le niveau de log */
+    .lv-OK{color:var(--sage)}
+    .lv-ERROR{color:var(--rose)}
+    .lv-WARN{color:var(--orange)}
+    .lv-RESTORE{color:var(--teal)}
+    .lv-ALERT{color:var(--rose)}
+    .lv-INFO{color:var(--muted)}
+    .lv-CHECK{color:var(--amber)}
+    .lv-WATCH{color:var(--amber)} /* Log pour le check rapide des 15s */
+    .lv-PING{color:var(--dim)}
+    .lv-SAVE{color:var(--sage)}
+    .lv-MANUAL{color:var(--teal)}
+    .lv-SEND{color:var(--teal)}
+    .lv-START{color:var(--amber)}
+    .lv-DASH{color:var(--teal)}
+    .lv-STOP{color:var(--rose)}
+
+    /* Message quand la boîte de log est vide */
+    .empty-state{text-align:center;padding:40px;color:var(--dim);font-style:italic}
+
+    /* --- TOAST NOTIFICATIONS (Alertes flottantes) --- */
+    #toast{
+      position:fixed;
+      bottom:24px;
+      right:24px;
+      background:var(--raised);
+      color:var(--text);
+      padding:14px 24px;
+      border-radius:var(--r);
+      display:none; /* Masqué par défaut */
+      font-size:.85rem;
+      font-weight:600;
+      border:1px solid var(--amber); /* Bordure colorée pour attirer l'oeil */
+      box-shadow:0 8px 32px rgba(0,0,0,.5);
+      z-index:1000;
+      animation:slideIn .3s ease; /* Animation d'apparition */
+    }
+    @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+    /* --- INDICATEUR LIVE (Point clignotant temps réel) --- */
+    .live-dot{
+      width:8px;
+      height:8px;
+      border-radius:50%;
+      background:var(--sage); /* Vert de base */
+      display:inline-block;
+      margin-right:6px;
+      animation:pulse 2s infinite; /* Effet de battement de coeur */
+    }
+    @keyframes pulse{
+      0%,100%{opacity:1;box-shadow:0 0 8px var(--sage)}
+      50%{opacity:.3;box-shadow:none}
+    }
+
+    /* --- RESPONSIVE DESIGN (Mobiles & Petits écrans) --- */
+    @media(max-width:800px){
+      body{padding:16px}
+      .grid{grid-template-columns:repeat(2,1fr)}
+      .charts-grid{grid-template-columns:1fr}
+      .chart-card.full-width{grid-column:1/-1} /* Tous pleine largeur sur petit écran */
+      .chart-card{grid-column:1/-1}
+      .log-line{grid-template-columns:1fr;gap:2px} /* Superpose les éléments de log au lieu de les aligner horizontalement */
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==============================================
+       HEADER - En-tête principal de l'application
+       ============================================== -->
+  <div class="header">
+    <div>
+      <!-- Bouclier SVG (Feather icon) -->
+      <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Blog-API Monitor</h1>
+      <!-- Le point "En direct" pulse grâce à .live-dot -->
+      <p class="sub"><span class="live-dot" id="liveIndicator"></span>INF222 TAF1 · NYUMEA PEHA DARYL GERVAIS · Surveillance continue</p>
+    </div>
+  </div>
+
+  <!-- ==============================================
+       CARTES DE STATUT - Affichent l'état global
+       ============================================== -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-label">Render API</div>
+      <!-- Statut de la connexion, sera rempli par le JavaScript -->
+      <div class="card-value" id="renderStatus">···</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Articles sur Render</div>
+      <!-- Nombre d'articles détectés sur Render -->
+      <div class="card-value info" id="renderCount">···</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Sauvegarde locale</div>
+      <!-- Nombre d'articles sauvegardés dans backup.json -->
+      <div class="card-value ok" id="backupCount">···</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Restaurations auto</div>
+      <!-- Nombre total de restaurations depuis le Render (POST des articles manquants) -->
+      <div class="card-value" id="restores">···</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Erreurs d'API</div>
+      <!-- Nombre d'échecs de résolution / timeout pour Render -->
+      <div class="card-value err" id="errors">···</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Dernier Check Lourd</div>
+      <!-- Moment exact du dernier "checkCycle" (Toutes les 3 min) -->
+      <div class="card-value info" style="font-size:1rem" id="lastCheck">···</div>
+      <div class="timer" id="nextCheck"></div>
+    </div>
+  </div>
+
+  <!-- ==============================================
+       BOUTONS D'ACTIONS GLOBALES
+       ============================================== -->
+  <div class="actions">
+    <!-- Déclenche un check immédiat -->
+    <button id="btnCheck">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg> Forcer la vérification
+    </button>
+    
+    <!-- Déclenche une restauration de backup.json vers Render -->
+    <button class="sec" id="btnSync">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg> Envoyer Backup
+    </button>
+    
+    <!-- Redirige vers la doc Swagger de l'API de base -->
+    <button class="sec" id="btnRender">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg> Ouvrir API distante
+    </button>
+    
+    <!-- Ouvre le frontend hébergé (local pour test ou Render pour prod) -->
+    <button class="sec" id="btnFrontend">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+      </svg> Aller au Frontend
+    </button>
+    
+    <!-- [ACTION] M3: Bouton d'exportation PDF des Logs -->
+    <button class="sec" id="btnExportPDF" style="border-color:var(--teal); color:var(--teal);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>
+      </svg> Exporter PDF
+    </button>
+
+    <!-- [ACTION] Maintenance V1: Bouton de Sauvegarde Manuelle (Fetch -> Backup.json) -->
+    <button class="sec" id="btnForceBackup" style="border-color:var(--orange); color:var(--orange); margin-left:10px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:5px; vertical-align:middle;">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v13a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+      </svg> Sauvegarder Localement
+    </button>
+  </div>
+
+  <!-- ==============================================
+       GRAPHIQUES - Statistiques métriques
+       ============================================== -->
+  <div class="section-title">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Graphiques d'utilisation
+  </div>
+  <div class="charts-grid">
+    <!-- [ACTION] M2: Affichage pleine largeur via classe full-width -->
+    <div class="chart-card full-width">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin-bottom:0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Temps de réponse API (ms)
+        </h3>
+        <!-- [ACTION] M2: Interface de contrôle du zoom -->
+        <div class="zoom-controls">
+          <button id="btnZoomOut" title="Zoom Arrière (Moins de détails)">-</button>
+          <span id="zoomLevelLabel">Échelle: ms </span>
+          <button id="btnZoomIn" title="Zoom Avant (Plus de détails)">+</button>
+        </div>
+      </div>
+      <!-- Le graphe linéaire -->
+      <canvas id="chartResponse"></canvas>
+    </div>
+    <div class="chart-card full-width">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Dernières 24h : Succès / Échecs
+      </h3>
+      <!-- Le graphe en barres empilées -->
+      <canvas id="chartChecks"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Sources de requêtes (Répartition)
+      </h3>
+      <!-- Le diagramme circulaire (Donut) -->
+      <canvas id="chartSources"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Méthodes HTTP de l'API appelées
+      </h3>
+      <!-- Le graphe de barres horizontales -->
+      <canvas id="chartMethods"></canvas>
+    </div>
+  </div>
+
+  <!-- ==============================================
+       JOURNAL DES LOGS
+       ============================================== -->
+  <div class="section-title">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Journal des opérations (En direct)
+  </div>
+  <div class="log-box" id="logBox">
+    <!-- Un placeholder affiché avant que les données n'arrivent -->
+    <div class="empty-state">En attente de connexion... (EventSource Stream)</div>
+  </div>
+
+  <!-- Div conteneur pour les pop-ups (Toasts) système -->
+  <div id="toast"></div>
+
+<script>
+  /* ══════════════════════════════════════════════════════════════════════
+     JAVASCRIPT CLIENT — Dashboard Blog-API Monitor (Temps Réel via SSE)
+     ══════════════════════════════════════════════════════════════════════ */
+
+  // Niveaux de journalisation valides pour le CSS (.lv-OK, .lv-ERROR, etc.)
+  var LEVELS = ['OK','ERROR','WARN','RESTORE','ALERT','INFO','CHECK','WATCH','PING','SAVE','MANUAL','SEND','START','DASH','STOP'];
+
+  // [ACTION] M2: Variables globales du zoom pour affiner l'affichage du chart Response
+  var currentZoomLevel = 0; // 0: 50 derniers points, 1: 30s/1h, 2: 1min/6h, 3: 1h/24h
+  var lastStats = null;     // Cache local des stats pour forcer le redessin au survol CSS
+
+  /* Affiche une petite notification qui disparait après 3.5s */
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(function() { t.style.display = 'none'; }, 3500); // Chrono de disparition
+  }
+
+  /* Fonction d'échappement pour empêcher l'injection de balises html dans les logs (Failles XSS) */
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* --------------------------------------------------------------------------
+     [NOUVEAU] SSE (Server-Sent Events) - Connexion continue
+     Le serveur pousse { state, stats } dès qu'il y a un changement ou un log !
+     -------------------------------------------------------------------------- */
+  
+  // On crée une connexion permanente vers la route streamisée par monitor.js
+  var evtSource = new EventSource('/api/stream');
+
+  // Si on reçoit des données du serveur...
+  evtSource.onmessage = function(e) {
+    try {
+      // Les données sont du JSON renvoyé par res.write('data: ' + JSON) dans monitor.js
+      var payload = JSON.parse(e.data);
+      if (payload.state) updateUIWithState(payload.state); // Rafraîchir les cartes et le journal
+      if (payload.stats) {
+        lastStats = payload.stats; // [ACTION] M2: Mise en cache avant le redessin
+        updateChartsWithStats(payload.stats); // Redessiner les canvas graphiques
+      }
+    } catch (err) {
+      console.error('Erreur de décodage SSE :', err);
+    }
+  };
+
+  // En cas d'erreur réseau (ex: serveur redémarré), EventSource tente automatiquement de se reconnecter.
+  evtSource.onerror = function() {
+    var indicator = document.getElementById('liveIndicator');
+    indicator.style.background = 'var(--rose)'; // Rouge
+    indicator.style.animation = 'none'; // Stoppe le clignotement
+    document.getElementById('renderStatus').innerHTML = 'Connexion perdue avec le Monitor...';
+  };
+
+  // Quand la connexion se rétablit...
+  evtSource.onopen = function() {
+    var indicator = document.getElementById('liveIndicator');
+    indicator.style.background = 'var(--sage)'; // Repasse au Vert
+    indicator.style.animation = 'pulse 2s infinite'; // Relance le CSS "pulse"
+  };
+
+  /* --------------------------------------------------------------------------
+     Mise à jour DOM (Cartes et Logs) en fonction du `STATE` envoyé par le Push
+     -------------------------------------------------------------------------- */
+  function updateUIWithState(s) {
+    // ---- 1. Carte : Statut du Render ----
+    var el = document.getElementById('renderStatus');
+    if (s.renderOnline) {
+      // Icône verte de validation (Check Circle)
+      el.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#5cbf8a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> En ligne';
+      el.className = 'card-value ok';
+    } else {
+      // Icône rouge barrée/erreur
+      el.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#e05a5a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> Hors ligne';
+      el.className = 'card-value err';
+    }
+    
+    // ---- 2. Autres cartes ----
+    // Injecte simplement la valeur textuelle
+    document.getElementById('renderCount').textContent = s.renderCount;
+    document.getElementById('backupCount').textContent = s.backupCount;
+    document.getElementById('restores').textContent    = s.restores;
+    document.getElementById('errors').textContent      = s.errors;
+    document.getElementById('lastCheck').textContent   = s.lastCheckTime || '—';
+
+    // ---- 3. Compte à rebours du grand check ----
+    var secs = s.nextCheckIn || 0;
+    document.getElementById('nextCheck').textContent = 'Prochain gros check dans ' + Math.floor(secs/60) + 'm ' + (secs%60) + 's';
+
+    // ---- 4. Le Grand Journal (Logs) ----
+    var box = document.getElementById('logBox');
+    
+    // Si la liste est vide (ne devrait théoriquement plus arriver sauf au tout début d'un vidage)
+    if (!s.logs || s.logs.length === 0) {
+      box.innerHTML = '<div class="empty-state">Aucun log pour le moment...</div>';
+      return;
+    }
+    
+    // Itérer la liste de logs (qui est déjà envoyée classée chronologiquement inverse grâce à unshift())
+    var html = '';
+    for (var i = 0; i < s.logs.length; i++) {
+      var l = s.logs[i];
+      // On s'assure d'avoir une classe CSS existante ou 'INFO' par défaut.
+      var lvCls = LEVELS.indexOf(l.level) >= 0 ? l.level : 'INFO';
+      
+      // On construit la ligne 
+      html += '<div class="log-line">'
+        + '<span class="t">' + esc(l.time) + '</span>' // "12:05:32"
+        + '<span class="lv lv-' + lvCls + '">' + esc(l.level) + '</span>' // "OK", "WARN"...
+        + '<span class="msg">' + esc(l.msg) + '</span>' // Message d'explication.
+        + '</div>';
+    }
+    // MAJ radicale du DOM (rapide)
+    box.innerHTML = html;
+  }
+
+  /* --------------------------------------------------------------------------
+     Mise à jour des Graphiques via les Statistiques poussées.
+     -------------------------------------------------------------------------- */
+  function updateChartsWithStats(stats) {
+    drawResponseChart(stats); // Ligne (Ping ms)
+    drawChecksChart(stats);   // Barres (Succès vs Échecs)
+    drawSourcesChart(stats);  // Donut (Sources des appels)
+    drawMethodsChart(stats);  // Barres Horizontales (GET/POST/PUT/DELETE)
+  }
+
+  /* ═══ UTILITAIRE DE DESSIN CANVAS ═══ */
+  
+  // Fonction globale pour redimensionner automatiquement le Canvas selon le DPI de l'écran.
+  function setupCanvas(id) {
+    var c = document.getElementById(id);
+    var dpr = window.devicePixelRatio || 1; // Adapté pour écran Retina/4K
+    var rect = c.getBoundingClientRect();
+    c.width = rect.width * dpr;
+    c.height = rect.height * dpr;
+    var ctx = c.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    return { ctx: ctx, w: rect.width, h: rect.height };
+  }
+
+  // Permet de dessiner des rectangles avec des coins arrondis dans un Canvas ctx
+  function roundRect(ctx, x, y, w, h, r) {
+    if (w < 0) w = 0; if (h < 0) h = 0;
+    if (r > w/2) r = w/2; if (r > h/2) r = h/2;
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+    ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r);
+    ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r);
+    ctx.quadraticCurveTo(x,y,x+r,y);
+  }
+
+  /* --------------------------------------------------------------------------
+     [1] Graphe : Temps de réponse API (Dessin d'une courbe de valeurs)
+     -------------------------------------------------------------------------- */
+     
+  // [ACTION] M2: Utilitaire d'agregation temporelle : parse la date FR "JJ/MM/AAAA HH:MM:SS"
+  function parseFrDate(str) {
+    if (!str) return Date.now();
+    var p = str.split(/[\s/:]/);
+    if(p.length < 6) return Date.now();
+    return new Date(p[2], p[1]-1, p[0], p[3], p[4], p[5]).getTime();
+  }
+
+  function drawResponseChart(stats) {
+    var c = setupCanvas('chartResponse');
+    var ctx=c.ctx, w=c.w, h=c.h;
+    
+    var rawData = stats.responseTimes || [];
+    var processedData = [];
+    var now = Date.now();
+    
+    var zlLabel = document.getElementById('zoomLevelLabel');
+    if (!zlLabel) return;
+    
+    // [ACTION] M2: Agrégation globale dynamisée par currentZoomLevel
+    if (currentZoomLevel === 0) {
+      zlLabel.textContent = "Échelle: ms (50 pts)";
+      processedData = rawData.slice(-50).map(function(d){ return d.ms; });
+    } else {
+      var maxAge = 0; var intervalMs = 0;
+      if (currentZoomLevel === 1) { 
+        zlLabel.textContent = "Échelle: s (m/30s)";
+        maxAge = 60 * 60 * 1000; intervalMs = 30 * 1000; 
+      }
+      else if (currentZoomLevel === 2) { 
+        zlLabel.textContent = "Échelle: min (m/1m)";
+        maxAge = 6 * 60 * 60 * 1000; intervalMs = 60 * 1000; 
+      }
+      else if (currentZoomLevel === 3) { 
+        zlLabel.textContent = "Échelle: h (m/1h)";
+        maxAge = 24 * 60 * 60 * 1000; intervalMs = 60 * 60 * 1000; 
+      }
+
+      var buckets = {};
+      rawData.forEach(function(d) {
+        var t = parseFrDate(d.time);
+        if (now - t <= maxAge) {
+          var bucketT = Math.floor(t / intervalMs) * intervalMs;
+          if (!buckets[bucketT]) buckets[bucketT] = { sum: 0, count: 0 };
+          buckets[bucketT].sum += d.ms;
+          buckets[bucketT].count++;
+        }
+      });
+      var keys = Object.keys(buckets).map(Number).sort(function(a,b){return a-b;});
+      processedData = keys.map(function(k) { return Math.round(buckets[k].sum / buckets[k].count); });
+    }
+
+    var vals = processedData;
+
+    // S'il n'y a qu'1 données ou aucune, on ne trace pas de courbe.
+    if (vals.length < 2) { 
+      ctx.fillStyle='#3d4560'; ctx.font='13px Inter'; ctx.textAlign='center'; 
+      ctx.fillText('Pas assez de données pour l\'échelle...',w/2,h/2); return; 
+    }
+    
+    // Définition de marges internes ("padding")
+    var pad={top:10,right:15,bottom:30,left:50};
+    var pW=w-pad.left-pad.right, pH=h-pad.top-pad.bottom;
+    
+    // Recherche des extrémas
+    var mx=Math.max.apply(null,vals), mn=Math.min.apply(null,vals);
+    if(mx===mn) mx=mn+100; // Force une visibilité même si la valeur est toujours fixe
+    
+    // --- Lignes de fond (Grille) ---
+    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+    for(var i=0;i<=4;i++){
+      var y=pad.top+(pH/4)*i; 
+      ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(w-pad.right,y);ctx.stroke(); 
+      ctx.fillStyle='#3d4560';ctx.font='10px JetBrains Mono';ctx.textAlign='right';
+      ctx.fillText(Math.round(mx-(mx-mn)*(i/4))+'ms',pad.left-6,y+4); // Échelle Y
+    }
+    
+    // --- Tracé de la courbe principale ---
+    ctx.beginPath(); ctx.strokeStyle='#3dbfb8'; ctx.lineWidth=2; ctx.lineJoin='round';
+    for(var j=0;j<vals.length;j++){
+      var x = pad.left+(pW/(vals.length-1))*j;      // X est calculé via le nb d'objets
+      var yv = pad.top+pH-((vals[j]-mn)/(mx-mn))*pH; // Y est % de l'espace par rapport max/min
+      if(j===0) ctx.moveTo(x,yv); else ctx.lineTo(x,yv);
+    }
+    ctx.stroke(); // Dessine la ligne
+    
+    // --- Remplissage de zone sous la courbe (Effet Design) ---
+    ctx.lineTo(pad.left+pW,pad.top+pH);ctx.lineTo(pad.left,pad.top+pH);ctx.closePath();
+    var gr=ctx.createLinearGradient(0,pad.top,0,pad.top+pH);
+    gr.addColorStop(0,'rgba(61,191,184,0.2)');   // Fonce en haut de ligne
+    gr.addColorStop(1,'rgba(61,191,184,0.01)');  // Transparent en bas du graph
+    ctx.fillStyle=gr; ctx.fill();
+    
+    // --- Petits cercles sur les points de données ---
+    for(var k=0;k<vals.length;k++){
+      var px=pad.left+(pW/(vals.length-1))*k;
+      var py=pad.top+pH-((vals[k]-mn)/(mx-mn))*pH;
+      ctx.beginPath();
+      ctx.arc(px,py,3,0,Math.PI*2); // Cercle de r=3
+      ctx.fillStyle='#3dbfb8';
+      ctx.fill();
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     [2] Graphe : Checks réussis vs. échoués (Diagramme colonnes empilées)
+     -------------------------------------------------------------------------- */
+  function drawChecksChart(stats) {
+    var c = setupCanvas('chartChecks');
+    var ctx=c.ctx, w=c.w, h=c.h;
+    var data = stats.hourlyActivity || [];
+    
+    // Gérer l'état vide
+    if (data.length===0){
+      ctx.fillStyle='#3d4560';ctx.font='13px Inter';ctx.textAlign='center';
+      ctx.fillText('Aucune activité horaire enregistrée...',w/2,h/2);return;
+    }
+    
+    var pad={top:10,right:15,bottom:35,left:40};
+    var pW=w-pad.left-pad.right, pH=h-pad.top-pad.bottom;
+    
+    // Définit la largeur d'une barre en la rendant dynamique (Max 30px)
+    var barW=Math.max(8,Math.min(30,pW/data.length-6));
+    
+    // Trouver quelle heure a généré le max combiné de succès + fail pour faire le MaxY
+    var maxC=1;
+    for(var i=0;i<data.length;i++){
+      var t=data[i].success+data[i].fail;
+      if(t>maxC) maxC=t;
+    }
+    
+    // [ACTION] Calculer le pas minimum pour eviter le chevauchement (18px est la largeur approx d'un label "15h")
+    var skipFactor = Math.ceil(18 / (pW / data.length)) || 1;
+
+    // Dessin barre par barre
+    for(var j=0;j<data.length;j++){
+      var x = pad.left+(pW/data.length)*j+(pW/data.length-barW)/2;
+      
+      // Proportions de chaque couleur
+      var sH = (data[j].success/maxC) * pH; 
+      var fH = (data[j].fail/maxC) * pH;
+      
+      // Bloc Vert (Succès) (en bas)
+      ctx.fillStyle='#5cbf8a'; ctx.beginPath();
+      roundRect(ctx,x,pad.top+pH-sH-fH,barW/2-1,sH,3);
+      ctx.fill();
+      
+      // Bloc Rouge (Échec) (au-dessus du vert)
+      ctx.fillStyle='#e05a5a'; ctx.beginPath();
+      roundRect(ctx,x+barW/2+1,pad.top+pH-fH,barW/2-1,fH,3);
+      ctx.fill();
+      
+      // Label en dessous (l'heure au format "15h")
+      // [ACTION] N'afficher le label textuel que si j est un multiple du skipFactor
+      if (j % skipFactor === 0) {
+        ctx.fillStyle='#3d4560'; ctx.font='9px JetBrains Mono'; ctx.textAlign='center';
+        ctx.fillText(data[j].hour?data[j].hour.slice(-2)+'h':'',x+barW/2,h-pad.bottom+14);
+      }
+    }
+    
+    // --- Légendes du Graphe (En bas à droite) ---
+    ctx.fillStyle='#5cbf8a'; ctx.fillRect(w-120,6,10,10); // Carré vert
+    ctx.fillStyle='#6b7394'; ctx.font='10px Inter'; ctx.textAlign='left'; 
+    ctx.fillText('Succès',w-106,15); // Label
+
+    ctx.fillStyle='#e05a5a'; ctx.fillRect(w-60,6,10,10); // Carré rouge
+    ctx.fillStyle='#6b7394'; ctx.fillText('Échec',w-46,15);
+  }
+
+  /* --------------------------------------------------------------------------
+     [3] Graphe : Requêtes par sources (Diagramme de type Donut/Camembert)
+     -------------------------------------------------------------------------- */
+  function drawSourcesChart(stats) {
+    var c = setupCanvas('chartSources');
+    var ctx=c.ctx, w=c.w, h=c.h;
+    
+    // [ACTION] Utilisation de callsByOrigin au lieu de requestsBySource pour montrer QUI appelle l'API
+    var src=stats.callsByOrigin||stats.requestsBySource||{};
+    var labels=['Monitor','Manuel','Externe','Réveil'];
+    var keys=['monitor','manual','external','wake'];
+    var colors=['#e5b84a','#3dbfb8','#5cbf8a','#6b7394'];
+    
+    var vals=keys.map(function(k){return src[k]||0;});
+    // Quantité totale de requêtes captées
+    var total=vals.reduce(function(a,b){return a+b;},0);
+    
+    if(total===0){
+      ctx.fillStyle='#3d4560';ctx.font='13px Inter';ctx.textAlign='center';
+      ctx.fillText('En attente des appels sources...',w/2,h/2);return;
+    }
+    
+    var cx=w*0.35, cy=h/2, radius=Math.min(w*0.3,h*0.4);
+    // On dessine de Haut (midi) dans le sens horaire
+    var startA=-Math.PI/2;
+    
+    // Arc pour chaque part de gâteau
+    for(var i=0;i<vals.length;i++){
+      if(vals[i]===0) continue; 
+      var sl=(vals[i]/total)*Math.PI*2; // Radian de la part
+      ctx.beginPath();
+      ctx.moveTo(cx,cy); 
+      ctx.arc(cx,cy,radius,startA,startA+sl); // Trace l'arc
+      ctx.closePath();
+      ctx.fillStyle=colors[i];
+      ctx.fill(); 
+      startA+=sl; // Prochaine part commence là où s'est terminée l'autre
+    }
+    
+    // Trou du donut au milieu
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius*0.55,0,Math.PI*2); // Un arc plus petit
+    ctx.fillStyle='#13161f'; // Couleur de font de page exact pour simuler un trou
+    ctx.fill();
+    
+    // Texte au centre du donut: le TOTAL
+    ctx.fillStyle='#e8e4d9'; ctx.font='700 18px Inter'; ctx.textAlign='center';
+    ctx.fillText(total,cx,cy+6);
+    
+    // --- Légendes (À droite du Donut) ---
+    var lx=w*0.65;
+    for(var j=0;j<labels.length;j++){
+      var ly=30+j*28; // Espacement de liste Y
+      ctx.fillStyle=colors[j];
+      ctx.beginPath(); ctx.arc(lx,ly,5,0,Math.PI*2); ctx.fill(); // Puce Couleur
+      ctx.fillStyle='#e8e4d9'; ctx.font='12px Inter'; ctx.textAlign='left';
+      ctx.fillText(labels[j]+' ('+vals[j]+')',lx+14,ly+4); // Nom et chiffre de part
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     [4] Graphe : Appels par méthodes de l'API (Barres horizontales)
+     -------------------------------------------------------------------------- */
+  function drawMethodsChart(stats) {
+    var c = setupCanvas('chartMethods');
+    var ctx=c.ctx, w=c.w, h=c.h;
+    var api=stats.apiCalls||{};
+    var methods=['GET','POST','PUT','DELETE'];
+    var colors=['#3dbfb8','#5cbf8a','#e5b84a','#e05a5a'];
+    
+    var vals=methods.map(function(m){return api[m]||0;});
+    var maxV=Math.max.apply(null,vals)||1; // Le Max pour savoir où finir les barres
+    
+    var pad={top:15,right:50,bottom:15,left:70};
+    var pW=w-pad.left-pad.right, pH=h-pad.top-pad.bottom;
+    
+    // Calcule la hauteur pour les 4 méthodes (géré pour pas être trop gros non plus)
+    var barH=Math.min(28,pH/methods.length-8);
+    
+    for(var i=0;i<methods.length;i++){
+      var y = pad.top+(pH/methods.length)*i+(pH/methods.length-barH)/2;
+      
+      // Pourcentage par rapport au Max d'appels existant
+      var bW = (vals[i]/maxV)*pW; 
+      if(bW<2 && vals[i]>0) bW=2; // Minimal visibility fallback si appelé au moins 1 fois
+      
+      // Texte nom d'action (GET, POST etc) gauche
+      ctx.fillStyle=colors[i]; ctx.font='700 12px JetBrains Mono'; ctx.textAlign='right'; 
+      ctx.fillText(methods[i],pad.left-10,y+barH/2+4);
+      
+      // Dessine la barre
+      ctx.beginPath(); roundRect(ctx,pad.left,y,bW,barH,4); 
+      ctx.fillStyle=colors[i]; ctx.fill();
+      
+      // Chiffre des appels, déposé à la fin (à la droite) de la barre
+      ctx.fillStyle='#e8e4d9'; ctx.font='600 11px Inter'; ctx.textAlign='left';
+      ctx.fillText(vals[i],pad.left+bW+8,y+barH/2+4);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     A C T I O N S   D E S   B O U T O N S   (API Appels Post)
+     ══════════════════════════════════════════════════════════════════════ */
+     
+  // [ACTION] M2: Listeners pour le changement temporel du graphique
+  document.getElementById('btnZoomOut').addEventListener('click', function() {
+    if (currentZoomLevel < 3) { 
+      currentZoomLevel++; 
+      if (lastStats) drawResponseChart(lastStats); 
+    }
+  });
+  document.getElementById('btnZoomIn').addEventListener('click', function() {
+    if (currentZoomLevel > 0) { 
+      currentZoomLevel--; 
+      if (lastStats) drawResponseChart(lastStats); 
+    }
+  });
+  
+  // Bouton : Vérifier Maintenant (Déclenche le cycle lourd du Monitor backend)
+  document.getElementById('btnCheck').addEventListener('click', function() {
+    showToast('Check complet envoyé... en attente !');
+    // Une fois la requête traitée, plus besoin d'appeler refresh() ! Le SSE (EventSource) le fera car le Monitor diffusera l'état !
+    fetch('/api/check',{method:'POST'}).catch(function(e) { console.error('Erreur appel /api/check', e); });
+  });
+
+  // Bouton : Restaurer vers Render (Pousse JSON vers L'API)
+  document.getElementById('btnSync').addEventListener('click', function() {
+    showToast('Synchro (Restauration) en cours...');
+    fetch('/api/sync',{method:'POST'})
+      .then(function(r){return r.json();})
+      .then(function(d){ showToast("Statut d'envoi: Démarré ! Surveillez les Logs"); })
+      .catch(function(e){ console.error(e); showToast("Echec d'envoi: "+e.message); });
+  });
+
+  // Bouton d'ouverture externe (Nouvel onglet vers la doc API)
+  document.getElementById('btnRender').addEventListener('click', function() {
+    window.open('https://api-blog-ruhu.onrender.com/api-docs','_blank'); // URL render avec Swagger
+  });
+
+  // Bouton d'ouverture externe (Nouvel onglet vers la Vue du Blog)
+  document.getElementById('btnFrontend').addEventListener('click', function() {
+    window.open('https://api-blog-ruhu.onrender.com/Frontend/index.html','_blank');
+  });
+
+  // [ACTION] M3: Génération intelligente et instantanée du PDF via jsPDF
+  document.getElementById('btnExportPDF').addEventListener('click', function() {
+    if (!lastStats || !window.jspdf) {
+      showToast("Génération PDF non prête. Patientez.");
+      return;
+    }
+    showToast("Génération du rapport PDF en cours...");
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(229, 184, 74); 
+    doc.text("Rapport d'État API-Monitor", 20, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(150, 150, 150);
+    var d = new Date();
+    doc.text("Généré le: " + d.toLocaleString('fr-FR'), 20, 28);
+    
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 32, 190, 32);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(40, 40, 40);
+    doc.text("Indicateurs Globaux", 20, 42);
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    var statusText = document.getElementById('renderStatus').innerText === '···' ? 'En ligne' : document.getElementById('renderStatus').innerText;
+    var renderC = document.getElementById('renderCount').innerText;
+    var backupC = document.getElementById('backupCount').innerText;
+    
+    doc.text("Connexion Render : " + statusText, 25, 50);
+    doc.text("Articles sur l'API distante : " + renderC, 25, 56);
+    doc.text("Articles dans le backup local : " + backupC, 25, 62);
+    
+    var tReq = Object.values(lastStats.apiCalls||{}).reduce(function(a,b){return a+b;},0);
+    doc.text("Total d'opérations métiers tracées : " + tReq, 25, 68);
+    
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Mémoire du Serveur (Derniers Logs)", 20, 85);
+    doc.line(20, 88, 190, 88);
+    
+    doc.setFont("courier", "normal");
+    doc.setFontSize(8);
+    var logsDom = document.querySelectorAll('.log-line');
+    var yPos = 95;
+    
+    for (var i = 0; i < Math.min(logsDom.length, 35); i++) {
+        var el = logsDom[i];
+        var t = el.querySelector('.t') ? el.querySelector('.t').innerText : "";
+        var lv = el.querySelector('.lv') ? el.querySelector('.lv').innerText : "";
+        var m = el.querySelector('.msg') ? el.querySelector('.msg').innerText : "";
+        
+        var txt = "[" + t + "] [" + lv + "] " + m;
+        // Coupe char pour rentrer dans la page (A4 w=210mm)
+        if (txt.length > 95) txt = txt.substring(0, 92) + "...";
+        
+        doc.text(txt, 20, yPos);
+        yPos += 5;
+    }
+    
+    doc.save("blog-api-report-" + d.toISOString().slice(0,10) + ".pdf");
+    setTimeout(function() { showToast("PDF téléchargé !"); }, 1000);
+  });
+
+  /* --------------------------------------------------------------------------
+     [ACTION] Maintenance V1: Logique de Backup Manuel (Force Save)
+     -------------------------------------------------------------------------- */
+  document.getElementById('btnForceBackup').addEventListener('click', function() {
+    if (!confirm('Voulez-vous ecraser la sauvegarde locale backup.json avec les articles de Render ?')) return;
+
+    fetch('/api/backup/force-save', { method: 'POST' })
+      .then(function(res) {
+        if (res.ok) {
+          showToast('Demande de sauvegarde locale envoyee !');
+        } else {
+          showToast('Erreur lors de la demande de sauvegarde.');
+        }
+      })
+      .catch(function() { showToast('Erreur reseau.'); });
+  });
+
+</script>
+</body>
+</html>
