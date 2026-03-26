@@ -1,6 +1,7 @@
 # Blog-API Sync Monitor
 
-![](C:\Users\DSI\AppData\Roaming\marktext\images\2026-03-26-10-07-50-image.png)
+<img width="2560" height="1600" alt="image" src="https://github.com/user-attachments/assets/a8ba3027-821a-4e41-8aa8-b19ea874ff98" />
+
 
 
 
