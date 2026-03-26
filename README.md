@@ -1,5 +1,9 @@
 # Blog-API Sync Monitor
 
+![](C:\Users\DSI\AppData\Roaming\marktext\images\2026-03-26-10-07-50-image.png)
+
+
+
 Ce sous-projet est un outil de surveillance et de sauvegarde en temps réel pour l'API Blog (INF222). 
 Il a été conçu pour pallier le problème du "disque éphémère" sur la version gratuite de Render, qui supprime la base de données SQLite à chaque redémarrage.
 
@@ -15,6 +19,7 @@ Il a été conçu pour pallier le problème du "disque éphémère" sur la versi
 
 Ce projet **ne dépend d'aucun module externe** (pas besoin de `npm install`). 
 Il utilise exclusivement les bibliothèques standards de Node.js pour garantir sa légèreté :
+
 - `http` / `https` : Serveur web du Dashboard et requêtes vers Render.
 - `fs` : Enregistrement des données (`backup.json`, `stats.json`, `monitor.log`).
 - `path` : Gestion des chemins de fichiers.
@@ -39,6 +44,7 @@ MONITOR_API/
 
 1. **Démarrer le script**
    Ouvrez un terminal dans le dossier `sync-monitor` et exécutez :
+   
    ```bash
    node monitor.js
    ```
@@ -48,6 +54,7 @@ MONITOR_API/
    [http://localhost:4250](http://localhost:4250)
 
 3. **Interactions**
+   
    - **Forcer la vérification** : Ping manuel de Render pour vérifier l'état actuel.
    - **Envoyer Backup** : Force le renvoi des articles de `backup.json` vers Render (utile si la synchro auto est capricieuse).
    - Les modifications effectuées via le **Frontend ou Postman** vers Render apparaîtront **instantanément** sur le Dashboard !
@@ -55,10 +62,12 @@ MONITOR_API/
 ## ⚙️ Configuration (dans `monitor.js`)
 
 Vous pouvez ajuster les paramètres suivants dans l'objet `CFG` tout en haut de `monitor.js` :
+
 - `intervalMs` : Délai entre les vérifications complètes (Check) (par défaut : 3 minutes).
 - `watchIntervalMs` : Surveillance rapide des changements (par défaut : 15 secondes).
 - `dashPort` : Port local du dashboard (par défaut : 4250).
 - `autoRestore` : Activer/Désactiver la restauration automatique de données (`true`/`false`).
 
 ---
+
 *Projet réalisé dans le cadre du cours INF222 - NYUMEA PEHA DARYL GERVAIS.*
